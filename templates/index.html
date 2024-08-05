@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL Information Checker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script>
+    function openMainTab(evt, tabName) {
+        var i, tabcontent, tablinks;
+
+        // Hide all main tab content
+        tabcontent = document.getElementsByClassName("main-tab-content");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].classList.remove("active");
+        }
+
+        // Remove active class from all main tab links
+        tablinks = document.getElementsByClassName("nav-link");
+        for (i = 0; i < tablinks.length; i++) {
+            tablinks[i].classList.remove("active");
+        }
+
+        // Show the clicked main tab content and add active class to the clicked link
+        document.getElementById(tabName).classList.add("active");
+        evt.currentTarget.classList.add("active");
+
+        // Reset inner tabs if 'analysis' tab is selected
+        if (tabName === 'analysis') {
+            openInnerTab(document.querySelector("#summary-tab"), 'summary');
+        }
+    }
+
+    function openInnerTab(evt, tabName) {
+        var i, tabcontent, tablinks;
+
+        // Hide all inner tab content
+        tabcontent = document.getElementsByClassName("vt-tab-content");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].classList.remove("active");
+        }
+
+        // Remove active class from all inner tab links
+        tablinks = document.getElementsByClassName("vt-tab-links");
+        for (i = 0; i < tablinks.length; i++) {
+            tablinks[i].classList.remove("active");
+        }
+
+        // Show the clicked inner tab content and add active class to the clicked link
+        document.getElementById(tabName).classList.add("active");
+        evt.classList.add("active");
+    }
+        window.onload = function() {
+            var modal = document.getElementById("welcomeModal");
+            var span = document.getElementsByClassName("close")[0];
+
+            if (!localStorage.getItem('modalShown')) {
+                modal.style.display = "block";
+
+                span.onclick = function() {
+                    modal.style.display = "none";
+                    localStorage.setItem('modalShown', 'true');
+                }
+
+                window.onclick = function(event) {
+                    if (event.target == modal) {
+                        modal.style.display = "none";
+                        localStorage.setItem('modalShown', 'true');
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>URL Information Checker</h1>
+        <ul class="nav-tabs">
+            <li class="nav-item">
+                <a class="nav-link active" onclick="openMainTab(event, 'analysis')">URL Search and Analysis</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" onclick="openMainTab(event, 'proxy')">Proxy Service</a>
+            </li>
+        </ul>
+        <div id="analysis" class="main-tab-content active">
+            <form method="POST">
+                <label for="url">Enter URL:</label>
+                <input type="text" id="url" name="url" required>
+                <button type="submit">Search</button>
+            </form>
+            {% if result %}
+            <div class="result">
+                <h2>VirusTotal Results for: {{ result.url if result.url else 'N/A' }}</h2>
+                {% if result.error %}
+                    <p class="error">Error: {{ result.error }}</p>
+                {% else %}
+                    <div class="vt-tabs">
+                        <div id="summary-tab" class="vt-tab-links active" onclick="openInnerTab(this, 'summary')">Summary</div>
+                        <div class="vt-tab-links" onclick="openInnerTab(this, 'relations')">Relations</div>
+                        <div class="vt-tab-links" onclick="openInnerTab(this, 'comments')">Community Comments</div>
+                    </div>
+                    <div id="summary" class="vt-tab-content active">
+                        <p><span class="label">Malicious detections:</span> {{ result.malicious_count }} out of {{ result.total_scans }}</p>
+                        <p><span class="label">Suggested URL Category:</span> {{ result.suggested_category }}</p>
+                        <p><span class="label">All Categories:</span> {{ result.all_categories }}</p>
+                        <p><span class="label">Vendor Analysis (Top 10):</span></p>
+                        <ul>
+                            {% for vendor, analysis in result.vendor_analysis.items() %}
+                                <li><strong>{{ vendor }}:</strong> {{ analysis }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    <div id="relations" class="vt-tab-content">
+                        <p><span class="label">Subdomains:</span></p>
+                        <ul>
+                            {% for subdomain in result.subdomains %}
+                                <li>{{ subdomain }}</li>
+                            {% endfor %}
+                        </ul>
+                        <p><span class="label">URLs:</span></p>
+                        <ul>
+                            {% for url in result.urls %}
+                                <li>{{ url }}</li>
+                            {% endfor %}
+                        </ul>
+                        <p><span class="label">Communicating Files:</span></p>
+                        <ul>
+                            {% for file in result.communicating_files %}
+                                <li>{{ file }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    <div id="comments" class="vt-tab-content">
+                        <p><span class="label">Community Comments:</span></p>
+                        <ul>
+                            {% for comment in result.community_comments %}
+                                <li>{{ comment }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% if not result.community_comments %}
+                            <p>No community reviews available</p>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% if whois_result %}
+                <div class="whois-info">
+                    <h2>Whois Information for: {{ whois_result.domain if whois_result.domain else 'N/A' }}</h2>
+                    {% if whois_result.error %}
+                        <p class="error">Error: {{ whois_result.error }}</p>
+                    {% else %}
+                        <div class="info">
+                            <p><span class="label">Registrar:</span> {{ whois_result.registrar }}</p>
+                            <p><span class="label">Creation Date:</span> {{ whois_result.creation_date }}</p>
+                            <p><span class="label">Expiration Date:</span> {{ whois_result.expiration_date }}</p>
+                            <p><span class="label">Name Servers:</span> {{ whois_result.name_servers | join(', ') }}</p>
+                            <p><span class="label">Organization:</span> {{ whois_result.org }}</p>
+                            <p><span class="label">State:</span> {{ whois_result.state }}</p>
+                            <p><span class="label">Country:</span> {{ whois_result.country }}</p>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endif %}
+            {% if urlscan_url %}
+                <div class="result">
+                    <h2>URLScan.io Results</h2>
+                    <p>View the scan results for the URL on URLScan.io:</p>
+                    <a href="{{ urlscan_url }}" target="_blank">{{ urlscan_url }}</a>
+                </div>
+            {% endif %}
+            {% if google_url %}
+                <div class="result">
+                    <h2>Google Search Results</h2>
+                    <p>Search the URL on Google:</p>
+                    <a href="{{ google_url }}" target="_blank">{{ google_url }}</a>
+                </div>
+            {% endif %}
+            {% if twitter_url %}
+                <div class="result">
+                    <h2>Twitter Search Results</h2>
+                    <p>Search the URL on Twitter:</p>
+                    <a href="{{ twitter_url }}" target="_blank">{{ twitter_url }}</a>
+                </div>
+            {% endif %}
+            {% if tweets %}
+                <div class="result">
+                    <h2>Relevant Tweets</h2>
+                    <ul>
+                        {% for tweet in tweets %}
+                            <li>{{ tweet }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+        </div>
+
+        <div id="proxy" class="main-tab-content">
+            <form method="GET" action="/proxy">
+                <label for="proxy-url">Enter URL to Proxy:</label>
+                <input type="text" id="proxy-url" name="url" required>
+                <button type="submit">Access</button>
+            </form>
+            {% if proxy_url %}
+                <div class="result">
+                    <h2>Proxy Access</h2>
+                    <iframe src="{{ proxy_url }}" style="width:100%; height:600px;" frameborder="0"></iframe>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Modal for Welcome Message -->
+    <div id="welcomeModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Welcome to URL Information Checker</h2>
+            <p>Use this tool to analyze URLs, check proxy services, and more.</p>
+        </div>
+    </div>
+</body>
+</html>
