@@ -19,6 +19,8 @@ body {
 
 h1 {
     color: #333;
+    text-align: center;
+    margin-bottom: 30px;
 }
 
 form {
@@ -42,6 +44,7 @@ button {
     color: #fff;
     border-radius: 4px;
     cursor: pointer;
+    transition: background-color 0.3s ease;
 }
 
 button:hover {
@@ -53,16 +56,18 @@ button:hover {
     font-weight: bold;
 }
 
-/* Tabs for URL Search and Proxy Service */
+/* Main Navigation Tabs */
 .nav-tabs {
     list-style-type: none;
     padding: 0;
     margin: 0;
     border-bottom: 1px solid #ddd;
+    display: flex;
+    justify-content: center;
 }
 
 .nav-tabs .nav-item {
-    display: inline-block;
+    margin-right: 5px;
 }
 
 .nav-tabs .nav-link {
@@ -71,7 +76,6 @@ button:hover {
     background-color: #f1f1f1;
     border: 1px solid #ddd;
     border-radius: 4px;
-    margin-right: 5px;
     text-decoration: none;
     color: #333;
     display: inline-block;
@@ -88,28 +92,37 @@ button:hover {
 /* Main Tab Content */
 .main-tab-content {
     display: none;
+    padding-top: 20px;
 }
 
 .main-tab-content.active {
     display: block;
 }
 
-/* Tabs for VT Results */
+/* VT Result Tabs */
 .vt-tabs {
     display: flex;
+    justify-content: space-around;
     margin-bottom: 20px;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+    padding: 10px;
 }
 
 .vt-tab-links {
     cursor: pointer;
-    padding: 10px 20px;
+    padding: 10px 15px;
     background-color: #f1f1f1;
     border: 1px solid #ddd;
     border-radius: 4px;
-    margin-right: 5px;
     text-align: center;
     flex: 1;
     transition: background-color 0.3s, border-color 0.3s;
+    margin-right: 5px;
+}
+
+.vt-tab-links:last-child {
+    margin-right: 0;
 }
 
 .vt-tab-links.active {
@@ -131,6 +144,19 @@ button:hover {
 
 .vt-tab-content.active {
     display: block;
+}
+
+/* WHOIS Information Styling */
+.whois-info {
+    margin-top: 30px;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}
+
+.whois-info h2 {
+    margin-top: 0;
 }
 
 /* Modal Styles */

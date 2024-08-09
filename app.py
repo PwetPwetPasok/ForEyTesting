@@ -6,6 +6,7 @@ import whois
 import tweepy
 from dotenv import load_dotenv
 from urllib.parse import urlparse
+from datetime import datetime
 
 # Load environment variables from .env file
 load_dotenv()
@@ -24,7 +25,7 @@ if not TWITTER_BEARER_TOKEN:
 if not SCREENSHOT_API_KEY:
     raise ValueError("Screenshot API key is not set in environment variables.")
 
-VT_URL = 'https://www.virustotal.com/api/v3/urls'
+VT_URL = 'http://www.virustotal.com/api/v3/urls'
 SCREENSHOT_URL = 'https://api.screenshotapi.net/screenshot'
 
 def normalize_url(url):
@@ -33,19 +34,42 @@ def normalize_url(url):
         return url.split('://', 1)[-1]
     return url
 
+def format_detection_results(malicious_count, total_scans):
+    """Format the detection result message."""
+    return f"Malicious {malicious_count}/{total_scans}"
+
 def get_virus_total_report(url):
     headers = {'x-apikey': API_KEY}
-    normalized_url = normalize_url(url)
-    url_to_encode = urlparse(normalized_url).netloc + urlparse(normalized_url).path
-    if not url_to_encode:
-        return {'error': 'Invalid URL format.'}
     
-    url_id = base64.urlsafe_b64encode(url_to_encode.encode('utf-8')).decode('utf-8').rstrip('=')
+    # Ensure the URL includes the protocol (http or https)
+    if not urlparse(url).scheme:
+        url = 'http://' + url
+
+    # URL Encoding based on VirusTotal requirements
+    url_id = base64.urlsafe_b64encode(url.encode('utf-8')).decode('utf-8').rstrip('=')
     
     try:
+        # Attempt to retrieve the report from VirusTotal
         response = requests.get(f'{VT_URL}/{url_id}', headers=headers)
         data = response.json()
         
+        if 'error' in data and data['error'].get('code') == 'NotFoundError':
+            # If the URL is not found, submit it for analysis
+            submission_response = requests.post(VT_URL, headers=headers, data={'url': url})
+            submission_data = submission_response.json()
+
+            if 'error' in submission_data:
+                return {'error': f"Error submitting URL for analysis: {submission_data['error'].get('message', 'Unknown error occurred')}"}
+
+            # Extract the id for the submitted URL
+            submission_id = submission_data.get('data', {}).get('id')
+            if not submission_id:
+                return {'error': 'Error retrieving submission ID'}
+
+            # Attempt to retrieve the report again using the submission id
+            response = requests.get(f'{VT_URL}/{submission_id}', headers=headers)
+            data = response.json()
+
         if 'error' in data:
             error_message = data['error'].get('message', 'Unknown error occurred')
             return {'error': error_message}
@@ -57,12 +81,25 @@ def get_virus_total_report(url):
         scan_results = attributes.get('last_analysis_results', {})
         categories = attributes.get('categories', {})
 
-        top_malicious_vendors = {vendor: info['result'] for vendor, info in sorted(scan_results.items(), key=lambda x: x[1]['result'] == 'malicious', reverse=True)[:10]}
+        # Format the detection result message
+        detection_message = format_detection_results(malicious_count, total_scans)
         
+        # Top malicious vendors
+        top_malicious_vendors = {
+            vendor: info['result']
+            for vendor, info in sorted(
+                scan_results.items(),
+                key=lambda x: x[1]['result'] == 'malicious',
+                reverse=True
+            )[:10]
+        }
+        
+        # Community comments
         community_comments = attributes.get('community_reviews', [])
         if not community_comments:
             community_comments = ['No community reviews available']
         
+        # Relations
         relations = attributes.get('relations', {})
         subdomains = relations.get('subdomains', [])
         urls = relations.get('urls', [])
@@ -75,13 +112,14 @@ def get_virus_total_report(url):
         if not communicating_files:
             communicating_files = ['No communicating files found']
         
+        # Categories
         suggested_category = categories.get('suggested', 'N/A')
         all_categories = ', '.join(f'{key}: {value}' for key, value in categories.items())
         
+        # Return the analysis results
         return {
-            'url': normalized_url,
-            'malicious_count': malicious_count,
-            'total_scans': total_scans,
+            'url': url,
+            'detection_message': detection_message,
             'vendor_analysis': top_malicious_vendors,
             'community_comments': community_comments,
             'subdomains': subdomains,
@@ -109,14 +147,20 @@ def get_screenshot(url):
     except Exception as e:
         return f"Error fetching screenshot: {str(e)}"
 
+def format_date(date):
+    """Format datetime object to 'YYYY-MM-DD'."""
+    if isinstance(date, datetime):
+        return date.strftime('%Y-%m-%d')
+    return 'N/A'
+
 def get_whois_info(domain):
     try:
         domain_info = whois.whois(domain)
         result = {
             'domain': domain,
             'registrar': domain_info.registrar,
-            'creation_date': domain_info.creation_date,
-            'expiration_date': domain_info.expiration_date,
+            'creation_date': format_date(domain_info.creation_date[0] if isinstance(domain_info.creation_date, list) else domain_info.creation_date),
+            'expiration_date': format_date(domain_info.expiration_date[0] if isinstance(domain_info.expiration_date, list) else domain_info.expiration_date),
             'name_servers': domain_info.name_servers,
             'org': domain_info.get('org', 'N/A'),
             'state': domain_info.get('state', 'N/A'),

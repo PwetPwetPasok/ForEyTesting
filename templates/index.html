@@ -82,6 +82,9 @@
             <li class="nav-item">
                 <a class="nav-link" onclick="openMainTab(event, 'proxy')">Proxy Service</a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" onclick="openMainTab(event, 'monitor')">Monitoring</a>
+            </li>
         </ul>
         <div id="analysis" class="main-tab-content active">
             <form method="POST">
@@ -101,7 +104,7 @@
                         <div class="vt-tab-links" onclick="openInnerTab(this, 'comments')">Community Comments</div>
                     </div>
                     <div id="summary" class="vt-tab-content active">
-                        <p><span class="label">Malicious detections:</span> {{ result.malicious_count }} out of {{ result.total_scans }}</p>
+                        <p><span class="label">Malicious detections:</span> {{ result.detection_message }}</p>
                         <p><span class="label">Suggested URL Category:</span> {{ result.suggested_category }}</p>
                         <p><span class="label">All Categories:</span> {{ result.all_categories }}</p>
                         <p><span class="label">Vendor Analysis (Top 10):</span></p>
@@ -195,7 +198,6 @@
                 </div>
             {% endif %}
         </div>
-
         <div id="proxy" class="main-tab-content">
             <form method="GET" action="/proxy">
                 <label for="proxy-url">Enter URL to Proxy:</label>
