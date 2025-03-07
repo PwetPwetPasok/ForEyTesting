@@ -196,3 +196,24 @@ button:hover {
     text-decoration: none;
     cursor: pointer;
 }
+
+
+.result-card {
+    border-radius: 5px;
+    color: black;
+    font-size: 1.2em;
+    text-align: left;
+}
+.Dangerous {
+    background-color: red;
+}
+.Suspicious {
+    background-color: yellow;
+    color: #000;
+}
+.Undecided {
+    background-color: grey;
+}
+.Safe {
+    background-color: green;
+}

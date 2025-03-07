@@ -98,6 +98,11 @@
                 {% if result.error %}
                     <p class="error">Error: {{ result.error }}</p>
                 {% else %}
+                    <!-- Summarized Analyzer Result -->
+                    <div class="result-card {{ analysis_result.result_category }}">
+                        <p><strong>Overall Result:</strong> {{ analysis_result.result_category }}</p>
+                        <p><strong>Malicious Percentage:</strong> {{ analysis_result.malicious_percentage }}%</p>
+                    </div>
                     <div class="vt-tabs">
                         <div id="summary-tab" class="vt-tab-links active" onclick="openInnerTab(this, 'summary')">Summary</div>
                         <div class="vt-tab-links" onclick="openInnerTab(this, 'relations')">Relations</div>
@@ -105,7 +110,7 @@
                     </div>
                     <div id="summary" class="vt-tab-content active">
                         <p><span class="label">Malicious detections:</span> {{ result.detection_message }}</p>
-                        <p><span class="label">Suggested URL Category:</span> {{ result.suggested_category }}</p>
+                        <!--p><span class="label">Suggested URL Category:</span> {{ result.suggested_category }}</p-->
                         <p><span class="label">All Categories:</span> {{ result.all_categories }}</p>
                         <p><span class="label">Vendor Analysis (Top 10):</span></p>
                         <ul>
@@ -180,13 +185,6 @@
                     <a href="{{ google_url }}" target="_blank">{{ google_url }}</a>
                 </div>
             {% endif %}
-            {% if twitter_url %}
-                <div class="result">
-                    <h2>Twitter Search Results</h2>
-                    <p>Search the URL on Twitter:</p>
-                    <a href="{{ twitter_url }}" target="_blank">{{ twitter_url }}</a>
-                </div>
-            {% endif %}
             {% if tweets %}
                 <div class="result">
                     <h2>Relevant Tweets</h2>
@@ -212,13 +210,26 @@
             {% endif %}
         </div>
     </div>
+    <div id="monitor" class="main-tab-content">
+        <form method="GET" action="/monitor">
+            <label for="monitor-url" style="display: block; text-align: center; font-weight: bold;">Placeholder</label>
+        </form>
+        {% if monitor_url %}
+            <div class="result">
+                <h2>Monitor Access</h2>
+                <iframe src="{{ monitor_url }}" style="width:100%; height:600px;" frameborder="0"></iframe>
+            </div>
+        {% endif %}
+    </div>
+    
+</div>
 
     <!-- Modal for Welcome Message -->
     <div id="welcomeModal" class="modal">
         <div class="modal-content">
             <span class="close">&times;</span>
             <h2>Welcome to URL Information Checker</h2>
-            <p>Use this tool to analyze URLs, check proxy services, and more.</p>
+            <p>Use this tool to conduct comprehensive analyses of URLs, assess proxy services, and perform a range of other related tasks to ensure thorough evaluation and security.</p>
         </div>
     </div>
 </body>

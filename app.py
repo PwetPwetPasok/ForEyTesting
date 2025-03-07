@@ -1,12 +1,17 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, Response
 import requests
 import base64
 import os
 import whois
-import tweepy
+import logging
+import subprocess
 from dotenv import load_dotenv
 from urllib.parse import urlparse
 from datetime import datetime
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
+from analysis.analyzer import analyze_url
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -27,6 +32,7 @@ if not SCREENSHOT_API_KEY:
 
 VT_URL = 'http://www.virustotal.com/api/v3/urls'
 SCREENSHOT_URL = 'https://api.screenshotapi.net/screenshot'
+logging.basicConfig(level=logging.DEBUG)
 
 def normalize_url(url):
     """Remove the protocol from the URL if it exists."""
@@ -36,7 +42,7 @@ def normalize_url(url):
 
 def format_detection_results(malicious_count, total_scans):
     """Format the detection result message."""
-    return f"Malicious {malicious_count}/{total_scans}"
+    return f"{malicious_count}/{total_scans}"
 
 def get_virus_total_report(url):
     headers = {'x-apikey': API_KEY}
@@ -132,6 +138,31 @@ def get_virus_total_report(url):
     except Exception as e:
         return {'error': f"Error fetching VirusTotal report: {str(e)}"}
 
+def rewrite_html(html_content, original_url):
+
+    # Ensure the content is in UTF-8 encoding
+    html_content = html_content.decode('utf-8', 'replace')
+
+    soup = BeautifulSoup(html_content, 'html.parser')
+    base_url = urlparse(original_url)._replace(path='').geturl()  # Extract base URL
+
+    # Rewrite links
+    for link in soup.find_all('a', href=True):
+        link['href'] = urljoin(base_url, link['href'])
+
+    # Rewrite images
+    for img in soup.find_all('img', src=True):
+        img['src'] = urljoin(base_url, img['src'])
+
+    # Rewrite CSS and JavaScript links
+    for link in soup.find_all('link', href=True):
+        if link.get('rel') == ['stylesheet']:
+            link['href'] = urljoin(base_url, link['href'])
+    for script in soup.find_all('script', src=True):
+        script['src'] = urljoin(base_url, script['src'])
+
+    return str(soup)
+
 def get_screenshot(url):
     try:
         params = {
@@ -170,14 +201,48 @@ def get_whois_info(domain):
     except Exception as e:
         return {'error': f"Error fetching WHOIS information: {str(e)}"}
 
-def search_twitter(query):
+    
+@app.route('/proxy')
+def proxy():
+    url = request.args.get('url')
+    if not url:
+        return "Please provide a URL."
+
+    method = request.method
+    headers = {key: value for key, value in request.headers if key != 'Host'}
+
     try:
-        client = tweepy.Client(bearer_token=TWITTER_BEARER_TOKEN)
-        tweets = client.search_recent_tweets(query=query, max_results=5)
-        tweet_texts = [tweet.text for tweet in tweets.data] if tweets.data else ['No recent tweets found']
-        return tweet_texts
-    except Exception as e:
-        return [f"Error fetching Twitter data: {str(e)}"]
+        if method == 'GET':
+            response = requests.get(url, headers=headers, params=request.args, allow_redirects=True)
+        elif method == 'POST':
+            response = requests.post(url, headers=headers, data=request.form, params=request.args, allow_redirects=True)
+        elif method == 'PUT':
+            response = requests.put(url, headers=headers, data=request.data, params=request.args, allow_redirects=True)
+        elif method == 'DELETE':
+            response = requests.delete(url, headers=headers, params=request.args, allow_redirects=True)
+        elif method == 'PATCH':
+            response = requests.patch(url, headers=headers, data=request.data, params=request.args, allow_redirects=True)
+        elif method == 'HEAD':
+            response = requests.head(url, headers=headers, params=request.args, allow_redirects=True)
+        else:
+            return "Method not allowed.", 405
+
+        content_type = response.headers.get('Content-Type', '')
+
+        # Process and return the response based on content type
+        if 'text/html' in content_type:
+            response.encoding = response.apparent_encoding
+            rewritten_content = rewrite_html(response.content, url)
+            return Response(rewritten_content, status=response.status_code, content_type='text/html')
+        elif 'application/json' in content_type:
+            return Response(response.content, status=response.status_code, content_type='application/json')
+        elif 'application/xml' in content_type:
+            return Response(response.content, status=response.status_code, content_type='application/xml')
+        else:
+            return Response(response.content, status=response.status_code, content_type=content_type)
+    except requests.RequestException as e:
+        logging.error(f"Request error: {str(e)}")
+        return f"Request error: {str(e)}", 500
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -186,15 +251,18 @@ def index():
     screenshot_url = None
     urlscan_url = None
     google_url = None
-    twitter_url = None
-    tweets = None
     proxy_url = None
+    analysis_result = None
+    monitor_url = None
 
     if request.method == 'POST':
         url = request.form.get('url')
         
         if url:
             try:
+                # Perform URL analysis
+                analysis_result = analyze_url(url)
+
                 # Get VirusTotal report for the original URL
                 result = get_virus_total_report(url)
                 
@@ -216,10 +284,7 @@ def index():
 
                 # Construct Google and Twitter search URLs
                 google_url = f'https://www.google.com/search?q={normalized_query}'
-                twitter_url = f'https://twitter.com/search?q={normalized_query}'
                 
-                # Search Twitter
-                tweets = search_twitter(normalized_query)
 
             except Exception as e:
                 result = {'error': str(e)}
@@ -227,7 +292,7 @@ def index():
     if request.method == 'GET' and request.args.get('url'):
         proxy_url = request.args.get('url')
     
-    return render_template('index.html', result=result, whois_result=whois_result, screenshot_url=screenshot_url, urlscan_url=urlscan_url, google_url=google_url, twitter_url=twitter_url, tweets=tweets, proxy_url=proxy_url)
+    return render_template('index.html',monitor_url=monitor_url, result=result, whois_result=whois_result, screenshot_url=screenshot_url, urlscan_url=urlscan_url, google_url=google_url, proxy_url=proxy_url, analysis_result=analysis_result)
 
 if __name__ == '__main__':
     app.run(debug=True)
